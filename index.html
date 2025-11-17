@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Albita - Geospatial AI Assistant</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        #userInput {
+            width: 70%;
+            padding: 10px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #text-response {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            min-height: 100px;
+        }
+        #map-container {
+            margin: 10px 0;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Albita - Your Geospatial AI Assistant</h1>
+
+    <div>
+        <input type="text" id="userInput" placeholder="Ask Albita...">
+        <button onclick="sendQuery()">Send</button>
+        <button id="voiceButton" onclick="startVoiceRecognition()">🎤 Voice</button>
+    </div>
+
+    <!-- Text Response Section -->
+    <div id="text-response" class="text-response"></div>
+
+    <!-- Map Response Section -->
+    <div class="map-container">
+        <h2>Map</h2>
+        <div id="map"></div>
+    </div>
+
+    <!-- Preload Leaflet.js -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+    <script>
+        // Function to send query
+        async function sendQuery() {
+            const userInput = document.getElementById('userInput').value;
+            const textResponseDiv = document.getElementById('text-response');
+            const mapDiv = document.getElementById('map');
+            if (!userInput) {
+                textResponseDiv.innerHTML = "<p>Please enter a command.</p>";
+                return;
+            }
+
+            textResponseDiv.innerHTML = "<p>Processing your request...</p>";
+
+            try {
+                const response = await fetch('http://127.0.0.1:5000/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: userInput }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // If the response contains HTML, insert it directly
+                if (data.response.startsWith('<!DOCTYPE html>') ||
+                    data.response.startsWith('<html>') ||
+                    data.response.includes('<div id="map">')) {
+                    textResponseDiv.innerHTML = data.response;
+                    // Initialize the Leaflet map test script
+                    initializeLeafletMap();
+                } else {
+                    textResponseDiv.innerHTML = data.response;
+                }
+            } catch (error) {
+                console.error("Fetch error:", error);
+                textResponseDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+            document.getElementById('userInput').value = '';
+        }
+
+        // Allow sending query with Enter key
+        document.getElementById('userInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendQuery();
+            }
+        });
+
+        // Voice recognition functionality
+        function startVoiceRecognition() {
+            const textResponseDiv = document.getElementById('text-response');
+            textResponseDiv.innerHTML = "<p>Listening...</p>";
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            recognition.start();
+            recognition.onresult = function(event) {
+                const speechResult = event.results[0][0].transcript;
+                document.getElementById('userInput').value = speechResult;
+                textResponseDiv.innerHTML = `<p>Recognized: ${speechResult}</p>`;
+            };
+            recognition.onerror = function(event) {
+                textResponseDiv.innerHTML = `<p>Error occurred in recognition: ${event.error}</p>`;
+            };
+        }
+
+        // Leaflet Map Test Script
+        function initializeLeafletMap() {
+            // Initialize the map
+            var map = L.map('map').setView([0, 0], 2);
+
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Add a marker for testing
+            var marker = L.marker([0, 0]).addTo(map)
+                .bindPopup('Test Marker')
+                .openPopup();
+        }
+
+        // Initialize the map on page load
+        document.addEventListener('DOMContentLoaded', initializeLeafletMap);
+    </script>
+</body>
+</html>
